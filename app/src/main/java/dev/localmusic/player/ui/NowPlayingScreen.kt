@@ -78,6 +78,7 @@ fun NowPlayingScreen(vm: PlayerViewModel, onBack: () -> Unit, onOpenCompressor: 
     val lyricOrigin by vm.lyricOrigin.collectAsState()
     val lyricFetch by vm.lyricFetch.collectAsState()
     val autoLyrics by vm.autoLyrics.collectAsState()
+    val bluetoothLyrics by vm.bluetoothLyrics.collectAsState()
     val art by vm.art.collectAsState()
     val mode by vm.mode.collectAsState()
     val arrangement by vm.arrangement.collectAsState()
@@ -217,6 +218,8 @@ fun NowPlayingScreen(vm: PlayerViewModel, onBack: () -> Unit, onOpenCompressor: 
                 origin = lyricOrigin,
                 auto = autoLyrics,
                 onAutoChange = vm::setAutoLyrics,
+                bluetoothLyrics = bluetoothLyrics,
+                onBluetoothLyrics = vm::setBluetoothLyrics,
             )
         }
         if (player.queue.isNotEmpty()) {
@@ -253,6 +256,8 @@ private fun LyricsBlock(
     origin: LyricOrigin?,
     auto: Boolean,
     onAutoChange: (Boolean) -> Unit,
+    bluetoothLyrics: Boolean,
+    onBluetoothLyrics: (Boolean) -> Unit,
 ) {
     if (lyrics != null && lyrics.hasText() && origin == LyricOrigin.CACHE) {
         Text(
@@ -260,6 +265,20 @@ private fun LyricsBlock(
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+    }
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text("蓝牙车机滚动歌词", style = MaterialTheme.typography.bodyLarge)
+            Text(
+                "默认关闭。连上蓝牙后，车机标题随当前一句滚动。手机上仍显示歌名，歌手和专辑不变。",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Switch(checked = bluetoothLyrics, onCheckedChange = onBluetoothLyrics)
     }
     Row(
         modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
