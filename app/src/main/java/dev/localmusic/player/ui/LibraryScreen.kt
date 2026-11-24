@@ -16,6 +16,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -36,6 +37,7 @@ fun LibraryScreen(
     onOpenCompressor: () -> Unit,
 ) {
     val playlists by vm.playlists.collectAsState()
+    val bluetoothLyrics by vm.bluetoothLyrics.collectAsState()
     var creating by remember { mutableStateOf(false) }
     var name by remember { mutableStateOf("") }
     var pendingDelete by remember { mutableStateOf<Long?>(null) }
@@ -92,10 +94,25 @@ fun LibraryScreen(
             Text("本地音乐", style = MaterialTheme.typography.headlineLarge)
             Spacer(Modifier.height(6.dp))
             Text(
-                "只在这台设备上播放。联网歌词默认关闭，可在播放页打开。",
+                "只在这台设备上播放。联网歌词和车机滚动歌词默认都关闭。",
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            Spacer(Modifier.height(10.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text("蓝牙车机滚动歌词", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        "连上车机蓝牙时，标题栏滚动当前歌词。没有歌词时仍显示歌名。",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Switch(checked = bluetoothLyrics, onCheckedChange = vm::setBluetoothLyrics)
+            }
             Spacer(Modifier.height(8.dp))
             Row {
                 TextButton(onClick = { creating = true }) { Text("新建播放列表") }

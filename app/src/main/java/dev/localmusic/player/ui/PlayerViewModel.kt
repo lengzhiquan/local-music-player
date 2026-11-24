@@ -19,10 +19,12 @@ import dev.localmusic.player.library.AlbumArt
 import dev.localmusic.player.library.TrackSort
 import dev.localmusic.player.lyrics.LocalLyricLookup
 import dev.localmusic.player.lyrics.LrcLibClient
+import dev.localmusic.player.lyrics.LyricBroadcast
 import dev.localmusic.player.lyrics.LyricOrigin
 import dev.localmusic.player.lyrics.Lyrics
 import dev.localmusic.player.lyrics.LyricsCache
 import dev.localmusic.player.lyrics.LyricsLoader
+import dev.localmusic.player.playback.BluetoothLyricPreference
 import dev.localmusic.player.playback.NowPlaying
 import dev.localmusic.player.playback.PlayMode
 import dev.localmusic.player.playback.modeRetargetsQueue
@@ -45,7 +47,7 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
     private val session = (app as LocalMusicApp).session
     private val compressorSettings: CompressorSettings = (app as LocalMusicApp).compressor
     val compressor: StateFlow<CompressorParams> = compressorSettings.state
-    private val prefs = app.getSharedPreferences(PREFS, Application.MODE_PRIVATE)
+    private val prefs = app.getSharedPreferences(BluetoothLyricPreference.PREFS, Application.MODE_PRIVATE)
 
     val playlists = repository.playlists.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
     val energies = repository.energies.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
@@ -71,6 +73,9 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
 
     private val _autoLyrics = MutableStateFlow(prefs.getBoolean(KEY_AUTO_LYRICS, false))
     val autoLyrics: StateFlow<Boolean> = _autoLyrics.asStateFlow()
+
+    private val _bluetoothLyrics = MutableStateFlow(BluetoothLyricPreference.read(app))
+    val bluetoothLyrics: StateFlow<Boolean> = _bluetoothLyrics.asStateFlow()
 
     private val _trackSort = MutableStateFlow(TrackSort.entries.firstOrNull { it.name == prefs.getString(KEY_SORT, null) } ?: TrackSort.PLAYLIST)
     val trackSort: StateFlow<TrackSort> = _trackSort.asStateFlow()
@@ -290,6 +295,11 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
 
     fun setCompressorMakeup(value: Float) = compressorSettings.setMakeup(value)
 
+    fun setBluetoothLyrics(enabled: Boolean) {
+        _bluetoothLyrics.value = enabled
+        prefs.edit().putBoolean(BluetoothLyricPreference.KEY, enabled).apply()
+    }
+
     fun setAutoLyrics(enabled: Boolean) {
         _autoLyrics.value = enabled
         prefs.edit().putBoolean(KEY_AUTO_LYRICS, enabled).apply()
@@ -366,9 +376,7 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
             if (generation != lyricGeneration) return@launch
             _art.value = art
             if (local.lyrics != null) {
-                _lyrics.value = local.lyrics
-                _lyricOrigin.value = local.origin
-                _lyricFetch.value = LyricFetch.Idle
+                showLyrics(track.id.toString(), local.lyrics, local.origin)
             } else if (_autoLyrics.value && !local.cachedMiss) {
                 fetchOnline(trackId, force = false, generation = generation)
             }
@@ -387,9 +395,7 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
                         dev.localmusic.player.lyrics.LrcParser.parse(cached.raw)
                     }
                     if (parsed.hasText() && generation == lyricGeneration) {
-                        _lyrics.value = parsed
-                        _lyricOrigin.value = LyricOrigin.CACHE
-                        _lyricFetch.value = LyricFetch.Idle
+                        showLyrics(track.id.toString(), parsed, LyricOrigin.CACHE)
                     }
                     return@launch
                 }
@@ -416,9 +422,7 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
                         withContext(Dispatchers.IO) { LyricsCache.saveFound(getApplication(), track, raw) }
                         val parsed = dev.localmusic.player.lyrics.LrcParser.parse(raw)
                         if (parsed.hasText()) {
-                            _lyrics.value = parsed
-                            _lyricOrigin.value = LyricOrigin.CACHE
-                            _lyricFetch.value = LyricFetch.Idle
+                            showLyrics(track.id.toString(), parsed, LyricOrigin.CACHE)
                         } else {
                             _lyricFetch.value = LyricFetch.Empty
                         }
@@ -434,8 +438,14 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun playlistIdOf(track: TrackEntity) = track.playlistId
 
+    private fun showLyrics(mediaId: String, lyrics: Lyrics, origin: LyricOrigin?) {
+        _lyrics.value = lyrics
+        _lyricOrigin.value = origin
+        _lyricFetch.value = LyricFetch.Idle
+        LyricBroadcast.publish(mediaId, lyrics)
+    }
+
     companion object {
-        private const val PREFS = "player"
         private const val KEY_MODE = "mode"
         private const val KEY_PLAYLIST = "playlist"
         private const val KEY_AUTO_LYRICS = "auto_lyrics"
